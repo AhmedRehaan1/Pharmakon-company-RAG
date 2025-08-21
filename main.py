@@ -125,26 +125,59 @@ def query_vector_db(query, k=1):
 # )
 
 # %%
-query = "headach"  # Define your query
-results = query_vector_db(query,k=2) 
 
 #
-print_results(results)
+from langchain_core.prompts import ChatPromptTemplate
 
+#  Define the prompt template for the medical advisor assistant
+prompt_template = ChatPromptTemplate.from_template("""
+You are a helpful medical advisor assistant.
+A customer has described their condition or symptoms.
+You must choose the most relevant products from the retrieved list below and if there is no relevants say no products available, display the product price and its link.
+
+Customer Query: {input}
+
+Retrieved Products:
+{context}
+
+Instructions:
+- Recommend the most relevant product.
+- Explain briefly why the product matches the query.
+- If no suitable product is found, clearly say "No relevant product found."
+- Keep the answer short and professional.
+- Provide the product name, price, and link from provided context metadata.
+""")
+
+from langchain_openai import ChatOpenAI
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from langchain_core.prompts import ChatPromptTemplate
+def augmented_generation(query):
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    document_chain = create_stuff_documents_chain(llm, prompt_template)
+
+    # Wrap with retrieval
+    context = query_vector_db(query, k=2)
+
+    final_prompt = prompt_template.format(context=context, input=query)
+
+    response = llm.invoke(final_prompt)
+    print(response.content)
+    return response
 # %%
 import streamlit as st
 # Create a row with 2 columns: image on the left, title on the right
 col1, col2 = st.columns([1, 5])  # Adjust ratio as needed
 with col1:
-    st.image("logo.png", width=100)  # Replace with your image file path
+    st.image("logo.png", width=100) 
 with col2:
     st.title("Pharmakon Product Recommender")
 query = st.text_input("Enter your search query:")
 if query:
-    results = query_vector_db(query)
+    results = augmented_generation(query)
     if results:
-        mystr1= print_results(results)
-        st.write(mystr1)
+        st.write(results.content)
     else:
         st.write("we have no products for your query.")
 with st.sidebar:
