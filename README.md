@@ -2,8 +2,8 @@
 
 This project implements a product recommender system for Pharmakon, leveraging OpenAI embeddings and Streamlit for a user-friendly interface.
 
-(https://github.com/user-attachments/assets/4f6b7553-9eae-41b2-9a36-82f3c6f63adc)
-## Features
+[(https://github.com/user-attachments/assets/4f6b7553-9eae-41b2-9a36-82f3c6f63adc)
+](https://github.com/user-attachments/assets/4f6b7553-9eae-41b2-9a36-82f3c6f63adc)## Features
 
 - **Product Data Loading**: Loads product information from a JSON file.
 - **Vector Database Creation**: Utilizes OpenAI embeddings to create a searchable vector database of product descriptions.
