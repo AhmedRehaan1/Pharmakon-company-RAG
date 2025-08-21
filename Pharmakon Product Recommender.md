@@ -2,8 +2,6 @@
 
 This project implements a product recommender system for Pharmakon, leveraging OpenAI embeddings and Streamlit for a user-friendly interface.
 
-https://github.com/user-attachments/assets/ab12b65b-92ab-43b6-adef-4960be3d7bd4
-
 ## Features
 
 - **Product Data Loading**: Loads product information from a JSON file.
