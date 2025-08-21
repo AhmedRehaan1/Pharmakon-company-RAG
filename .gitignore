@@ -6,8 +6,6 @@ __pycache__/
 # Virtual environment files
 venv/
 .env
-.env_example
-
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
