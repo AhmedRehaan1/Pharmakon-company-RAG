@@ -18,6 +18,9 @@ venv/
 # Chroma database folder
 chroma_db/
 
+*.json
+*.old
+
 
 
 # Images (if you don't want to track them)

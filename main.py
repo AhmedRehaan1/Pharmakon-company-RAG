@@ -1,190 +1,67 @@
-# %%
-import os
-from dotenv import load_dotenv
-load_dotenv()  #load all the environment variables
+"""
+Pharmakon Product Recommender - Main Entry Point
+A clean architecture application for pharmaceutical product recommendations.
+"""
+import sys
+from pathlib import Path
 
-# %%
-os.environ["OPENAI_API_KEY"]=os.getenv("OPENAI_API_KEY")
+# Add project root to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent))
 
-# %%
-import json
-from langchain.schema import Document
-
-# Load JSON file
-with open("pharmakon_products.json", "r", encoding="utf-8") as f:
-    products = json.load(f)
-
-#  Convert each product description into a single Document
-# the embedding model will be for description, not for the whole product details , but we have metadata for each product
-docs = []
-for product in products:
-    docs.append(Document(
-        page_content=product["product_description"],  # full description in one chunk
-        metadata={
-            "name": product["product_name"],
-            "link": product["product_link"],
-            "price": product["product_price"]
-        }
-    ))
-
-#  Check first document
-print(docs[3])
+from config.settings import Settings
+from models.product import ProductDocument
+from services.data_loader import DataLoader
+from services.vector_store import VectorStoreManager
+from services.recommendation import RecommendationService
+from ui.streamlit_app import run_app
 
 
-# %%
-from langchain.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings
-
-from langchain.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings
-
-#  Initialize the embedding model
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
-
-#  Create a Chroma vector store from the docs
-if not os.path.exists("./chroma_db"):
-    vectordb = Chroma.from_documents(
-        documents=docs,       # your list of Document objects
-        embedding=embedding_model,
-        persist_directory="./chroma_db"  # folder to save vector database
-    )
-
-    #  Persist the database to disk
-    vectordb.persist()
-else:
-    if os.path.exists("./chroma_db"):
-    # Load existing database
-        vectordb = Chroma(
-            persist_directory="./chroma_db",
-            embedding_function=embedding_model
-        )
-        print("Loaded existing vector database.")
-
-
-print("Vector database created and persisted successfully!")
-
-
-# %%
-# def print_results(results):
-#     for i, doc in enumerate(results, 1):
-#         print(f"Result {i}:")
-#         print("Product Name:", doc.metadata["name"])
-#         print("Link:", doc.metadata["link"])
-#         print("Price:", doc.metadata["price"])
-#         print("Description:", doc.page_content[:300])  # preview first 300 chars
-#         print("----------------------------")
-def print_results(results):
+def initialize_application():
     """
-    Format the similarity search results into a string, one result per block.
-    """
-    if not results:
-        return "No results found above the threshold."
-
-    output = ""
-    for i, (doc, score) in enumerate(results, 1):  # unpack tuple
-        output += f"""Result {i} (Confidence: {score:.2f})\n
-Product Name: {doc.metadata["name"]}\n
-Link: {doc.metadata["link"]}\n
-Price: {doc.metadata["price"]}\n
-Description: {doc.page_content[:300]} 
-\n\n"""  # extra newline for separation
-
-    return output
-
-
-        
-
-# %%
-def query_vector_db(query, k=1):
-    """
-    Query the vector database and return top k results.
-    
-    Args:
-        query (str): The search query.
-        k (int): Number of top results to return.
+    Initialize the application by setting up all required services.
     
     Returns:
-        list: List of Document objects with metadata.
+        RecommendationService: Fully initialized recommendation service
     """
-    results_with_score = vectordb.similarity_search_with_score(query, k=k)
-    threshold = 0.6
-    filtered_results = [(doc, score) for doc, score in results_with_score if score >= threshold]
-    if not filtered_results:
-        print("No results found above the threshold.")
-        filtered_results = []  # Return empty list if no results meet the threshold
-        return 
+    # Validate configuration
+    Settings.validate()
+    
+    # Load product data
+    print("Loading product data...")
+    products = DataLoader.load_products_from_json(Settings.PRODUCTS_JSON_PATH)
+    DataLoader.validate_products(products)
+    print(f"Loaded {len(products)} products.")
+    
+    # Convert products to documents
+    documents = ProductDocument.from_products(products)
+    
+    # Initialize vector store
+    print("Initializing vector store...")
+    vector_store = VectorStoreManager()
+    vector_store.initialize(documents)
+    print(f"Vector store initialized with {vector_store.get_collection_count()} documents.")
+    
+    # Initialize recommendation service
+    recommendation_service = RecommendationService(vector_store)
+    
+    return recommendation_service
 
-    return filtered_results
 
-# %%
-# #  Load the persisted Chroma database
-# embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
-# vectordb = Chroma(
-#     persist_directory="./chroma_db",
-#     embedding_function=embedding_model
-# )
+def main():
+    """Main application entry point."""
+    try:
+        # Initialize all services
+        recommendation_service = initialize_application()
+        
+        # Run the Streamlit UI
+        run_app(recommendation_service)
+        
+    except Exception as e:
+        print(f"Error initializing application: {e}")
+        raise
 
-# %%
 
-#
-from langchain_core.prompts import ChatPromptTemplate
-
-#  Define the prompt template for the medical advisor assistant
-prompt_template = ChatPromptTemplate.from_template("""
-You are a helpful medical advisor assistant.
-A customer has described their condition or symptoms.
-You must choose the most relevant products from the retrieved list below and if there is no relevants say no products available, display the product price and its link.
-
-Customer Query: {input}
-
-Retrieved Products:
-{context}
-
-Instructions:
-- Recommend the most relevant product.
-- Explain briefly why the product matches the query.
-- If no suitable product is found, clearly say "No relevant product found."
-- Keep the answer short and professional.
-- Provide the product name, price, and link from provided context metadata.
-""")
-
-from langchain_openai import ChatOpenAI
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain_core.prompts import ChatPromptTemplate
-def augmented_generation(query):
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
-    document_chain = create_stuff_documents_chain(llm, prompt_template)
-
-    # Wrap with retrieval
-    context = query_vector_db(query, k=2)
-
-    final_prompt = prompt_template.format(context=context, input=query)
-
-    response = llm.invoke(final_prompt)
-    print(response.content)
-    return response
-# %%
-import streamlit as st
-# Create a row with 2 columns: image on the left, title on the right
-col1, col2 = st.columns([1, 5])  # Adjust ratio as needed
-with col1:
-    st.image("logo.png", width=100) 
-with col2:
-    st.title("Pharmakon Product Recommender")
-query = st.text_input("Enter your search query:")
-if query:
-    results = augmented_generation(query)
-    if results:
-        st.write(results.content)
-    else:
-        st.write("we have no products for your query.")
-with st.sidebar:
-    st.header("About")
-    st.write("Address: Giza – 6th of october city-4th District-neighboring first-Building 168")
-    st.write("Mob : 002 01028227758")
-    st.write("Email:pharmakon.info@pharmakonegypt.org")
-    st.write("Developed by Ahmed Rehaan")  # Replace with your name or organization
+if __name__ == "__main__":
+    main()
 
 
