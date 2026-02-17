@@ -4,14 +4,6 @@ A production-ready pharmaceutical product recommendation system built with **cle
 
 ## 🎥 Demo
 
-<<<<<<< HEAD
-https://github.com/user-attachments/assets/ab12b65b-92ab-43b6-adef-4960be3d7bd4
-
----
-=======
-https://github.com/user-attachments/assets/4f6b7553-9eae-41b2-9a36-82f3c6f63adc
->>>>>>> 39a9bae8f8166ec946498b967e22bc88ec49d374
-
 ## 📋 Table of Contents
 
 - [Features](#-features)
